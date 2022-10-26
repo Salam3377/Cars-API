@@ -27,40 +27,78 @@ const requireToken = passport.authenticate('bearer', { session: false })
 // instantiate a router (mini app that only handles routes)
 const router = express.Router()
 
+
+// Index
+// cars
+router.get('/cars', requireToken, (req, res, next) => {
+    Car.find()
+        .then(cars => {
+            return cars.map(car => car)
+        })
+        .then(cars =>  {
+            res.status(200).json({ cars: cars })
+        })
+        .catch(next)
+})
+
+//Show
+// /cars/:id
+router.get('/cars/:id', requireToken, (req, res, next) => {
+    Car.findById(req.params.id)
+    .then(handle404)
+    .then(car => {
+        res.status(200).json({ car: car })
+    })
+    .catch(next)
+})
+
+
 // Create
 // /car
-//required token removed for now
 router.post('/cars', requireToken , (req, res, next) => {
     req.body.car.owner = req.user.id
-
-    // one the front end I HAVE TO SEND a pet as the top level key
-    // pet: {name: '', type: ''}
     Car.create(req.body.car)
     .then(car => {
         res.status(201).json({ car: car })
     })
     .catch(next)
-    // .catch(error => next(error))
+
 
 })
 
 
-// INDEX
-// GET /examples
-//required token removed for now
-// router.get('/cars', (req, res, next) => {
-// 	Car.find()
-// 		.then((cars) => {
-// 			// `examples` will be an array of Mongoose documents
-// 			// we want to convert each one to a POJO, so we use `.map` to
-// 			// apply `.toObject` to each one
-// 			return cars.map((car) => car.toObject())
-// 		})
-// 		// respond with status 200 and JSON of the examples
-// 		.then((cars) => res.status(200).json({ cars: cars }))
-// 		// if an error occurs, pass it to the handler
-// 		.catch(next)
-// })
+// UPDATE
+// PATCH 
+router.patch('/cars/:id', requireToken, removeBlanks, (req, res, next) => {
+	delete req.body.car.owner
+	Car.findById(req.params.id)
+		.then(handle404)
+		.then((car) => {
+			requireOwnership(req, car)
+			return car.updateOne(req.body.car)
+		})
+		.then(() => res.sendStatus(204))
+		.catch(next)
+})
+
+// DESTROY
+// DELETE /
+router.delete('/cars/:id', requireToken, (req, res, next) => {
+	Car.findById(req.params.id)
+		.then(handle404)
+		.then((car) => {
+			// throw an error if current user doesn't own `example`
+			requireOwnership(req, car)
+			// delete the example ONLY IF the above didn't throw
+		    car.deleteOne()
+		})
+		// send back 204 and no content if the deletion succeeded
+		.then(() => res.sendStatus(204))
+		// if an error occurs, pass it to the handler
+		.catch(next)
+})
+
+
 
 
 module.exports = router
